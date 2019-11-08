@@ -15,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ZeroBudget.Areas.Identity;
 using ZeroBudget.Data;
+using ZeroBudget.Data.Services;
 
 namespace ZeroBudget
 {
@@ -39,6 +40,7 @@ namespace ZeroBudget
             services.AddRazorPages();
             services.AddServerSideBlazor();
             services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
+            services.AddSingleton<IBudgetingService, BudgetingService>();
             services.AddSingleton<WeatherForecastService>();
         }
 

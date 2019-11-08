@@ -3,15 +3,17 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ZeroBudget.Data;
 
 namespace ZeroBudget.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20191014165541_IncludesFrequenyTypes")]
+    partial class IncludesFrequenyTypes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -219,42 +221,6 @@ namespace ZeroBudget.Data.Migrations
                     b.ToTable("AspNetUserTokens");
                 });
 
-            modelBuilder.Entity("ZeroBudget.Data.ActualItem", b =>
-                {
-                    b.Property<int>("ActualItemId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("Money");
-
-                    b.Property<int>("BudgetCategoryId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("BudgetPeriodId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("Date")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("TransactionType")
-                        .HasColumnType("int");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)")
-                        .HasMaxLength(450);
-
-                    b.HasKey("ActualItemId");
-
-                    b.HasIndex("BudgetCategoryId");
-
-                    b.HasIndex("BudgetPeriodId");
-
-                    b.ToTable("ActualItems","ZeroBudget");
-                });
-
             modelBuilder.Entity("ZeroBudget.Data.BudgetCategory", b =>
                 {
                     b.Property<int>("BudgetCategoryId")
@@ -272,10 +238,6 @@ namespace ZeroBudget.Data.Migrations
 
                     b.Property<int?>("ParentBudgetCategoryId")
                         .HasColumnType("int");
-
-                    b.Property<string>("UserId")
-                        .HasColumnType("nvarchar(450)")
-                        .HasMaxLength(450);
 
                     b.HasKey("BudgetCategoryId");
 
@@ -306,127 +268,6 @@ namespace ZeroBudget.Data.Migrations
                         {
                             BudgetCategoryId = 5,
                             Name = "Transportation"
-                        },
-                        new
-                        {
-                            BudgetCategoryId = 6,
-                            Name = "Uncategorized"
-                        });
-                });
-
-            modelBuilder.Entity("ZeroBudget.Data.BudgetItem", b =>
-                {
-                    b.Property<int>("BudgetItemId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("Money");
-
-                    b.Property<int>("BudgetCategoryId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("BudgetPeriodId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("Date")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("FrequencyQuantity")
-                        .HasColumnType("int");
-
-                    b.Property<byte?>("FrequencyTypeId")
-                        .HasColumnType("tinyint");
-
-                    b.Property<bool>("IsReoccurring")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("TransactionType")
-                        .HasColumnType("int");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)")
-                        .HasMaxLength(450);
-
-                    b.HasKey("BudgetItemId");
-
-                    b.HasIndex("BudgetCategoryId");
-
-                    b.HasIndex("BudgetPeriodId");
-
-                    b.HasIndex("FrequencyTypeId");
-
-                    b.ToTable("BudgetItems","ZeroBudget");
-                });
-
-            modelBuilder.Entity("ZeroBudget.Data.BudgetPeriod", b =>
-                {
-                    b.Property<int>("BudgetPeriodId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
-
-                    b.Property<byte>("BudgetPeriodTypeId")
-                        .HasColumnType("tinyint");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UserId")
-                        .HasColumnType("nvarchar(450)")
-                        .HasMaxLength(450);
-
-                    b.HasKey("BudgetPeriodId");
-
-                    b.HasIndex("BudgetPeriodTypeId");
-
-                    b.ToTable("BudgetPeriods","ZeroBudget");
-                });
-
-            modelBuilder.Entity("ZeroBudget.Data.BudgetPeriodType", b =>
-                {
-                    b.Property<byte>("BudgetPeriodTypeId")
-                        .HasColumnType("tinyint");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(200)")
-                        .HasMaxLength(200);
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(100)")
-                        .HasMaxLength(100);
-
-                    b.HasKey("BudgetPeriodTypeId");
-
-                    b.ToTable("BudgetPeriodTypes","ZeroBudget");
-
-                    b.HasData(
-                        new
-                        {
-                            BudgetPeriodTypeId = (byte)1,
-                            Description = "Budget period occurs weekly",
-                            Name = "Weekly"
-                        },
-                        new
-                        {
-                            BudgetPeriodTypeId = (byte)2,
-                            Description = "Budget period occurs twice a month, every other week ",
-                            Name = "Bi-Weekly"
-                        },
-                        new
-                        {
-                            BudgetPeriodTypeId = (byte)3,
-                            Description = "Budget period occurs monthly",
-                            Name = "Monthly"
-                        },
-                        new
-                        {
-                            BudgetPeriodTypeId = (byte)4,
-                            Description = "Budget period occurs twice a month, typically the beginning and middle of the month.",
-                            Name = "Semi-Monthly"
                         });
                 });
 
@@ -451,31 +292,31 @@ namespace ZeroBudget.Data.Migrations
                     b.HasData(
                         new
                         {
-                            FrequencyTypeId = (byte)1,
+                            FrequencyTypeId = (byte)0,
                             Description = "Occurs the same day each 'n' month(s)",
                             Name = "Monthly"
                         },
                         new
                         {
-                            FrequencyTypeId = (byte)2,
+                            FrequencyTypeId = (byte)1,
                             Description = "Occurrs the same day each 'n' year(s)",
                             Name = "Annually"
                         },
                         new
                         {
-                            FrequencyTypeId = (byte)3,
+                            FrequencyTypeId = (byte)2,
                             Description = "Occurs the same day each 'n' week(s)",
                             Name = "Weekly"
                         },
                         new
                         {
-                            FrequencyTypeId = (byte)4,
+                            FrequencyTypeId = (byte)3,
                             Description = "Occurs the same day each 'n' day(s)",
                             Name = "Daily"
                         },
                         new
                         {
-                            FrequencyTypeId = (byte)5,
+                            FrequencyTypeId = (byte)4,
                             Description = "Occurs every day monday through Friday",
                             Name = "Monday - Friday"
                         });
@@ -528,49 +369,6 @@ namespace ZeroBudget.Data.Migrations
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("ZeroBudget.Data.ActualItem", b =>
-                {
-                    b.HasOne("ZeroBudget.Data.BudgetCategory", "BudgetCategory")
-                        .WithMany()
-                        .HasForeignKey("BudgetCategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ZeroBudget.Data.BudgetPeriod", "BudgetPeriod")
-                        .WithMany()
-                        .HasForeignKey("BudgetPeriodId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("ZeroBudget.Data.BudgetItem", b =>
-                {
-                    b.HasOne("ZeroBudget.Data.BudgetCategory", "BudgetCategory")
-                        .WithMany()
-                        .HasForeignKey("BudgetCategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ZeroBudget.Data.BudgetPeriod", "BudgetPeriod")
-                        .WithMany()
-                        .HasForeignKey("BudgetPeriodId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ZeroBudget.Data.FrequencyType", "FrequencyType")
-                        .WithMany()
-                        .HasForeignKey("FrequencyTypeId");
-                });
-
-            modelBuilder.Entity("ZeroBudget.Data.BudgetPeriod", b =>
-                {
-                    b.HasOne("ZeroBudget.Data.BudgetPeriodType", "BudgetPeriodType")
-                        .WithMany()
-                        .HasForeignKey("BudgetPeriodTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
