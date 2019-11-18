@@ -18,7 +18,7 @@ namespace ZeroBudget.Data.EntityClasses
         public decimal Amount { get; set; }
         public TransactionType TransactionType { get; set; }
         public bool IsReoccurring { get; set; }
-        public byte? FrequencyTypeId { get; set; }
+        public int? FrequencyTypeId { get; set; }
         public FrequencyType FrequencyType { get; set; }
         public int? FrequencyQuantity { get; set; }
     }

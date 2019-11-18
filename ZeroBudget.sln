@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.29403.142
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ZeroBudget", "ZeroBudget\ZeroBudget.csproj", "{7EB580CB-1BD7-4F1F-87D6-9CA62F5C828F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroBudget.Test", "ZeroBudget.Test\ZeroBudget.Test.csproj", "{C002DCF1-A1A4-4B82-A516-2750C3C50F35}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ZeroBudget.Test", "ZeroBudget.Test\ZeroBudget.Test.csproj", "{C002DCF1-A1A4-4B82-A516-2750C3C50F35}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

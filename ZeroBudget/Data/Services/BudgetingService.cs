@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using ZeroBudget.Data.EntityClasses;
+using static ZeroBudget.Data.Enumerations;
 
 namespace ZeroBudget.Data.Services
 {
@@ -18,21 +19,24 @@ namespace ZeroBudget.Data.Services
 
         #region BudgetPeriods
 
-        public Task<BudgetPeriod> GetBudgetPeriod(int budgetPeriodId)
+        public async Task<BudgetPeriod> GetBudgetPeriod(string userId, int budgetPeriodId)
         {
-            return _context.budgetPeriods
+            return await _context.budgetPeriods
+                .Include(bp => bp.BudgetPeriodType)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(
-                bp => bp.BudgetPeriodId == budgetPeriodId);
+                bp => bp.UserId == userId 
+                && bp.BudgetPeriodId == budgetPeriodId);
         }
 
-        public Task<List<BudgetPeriod>> GetBudgetPeriods(string userId)
+        public async Task<List<BudgetPeriod>> GetBudgetPeriods(string userId)
         {
             if (string.IsNullOrEmpty(userId))
                 // No user Id specified, return an empty list
-                return Task.FromResult(new List<BudgetPeriod>());
+                return new List<BudgetPeriod>();
 
-            return _context.budgetPeriods
+            return await _context.budgetPeriods
+                .Include(bp => bp.BudgetPeriodType)
                 .AsNoTracking()
                 // Get budget periods for the specified userId
                 .Where(bp => bp.UserId == userId)
@@ -41,14 +45,15 @@ namespace ZeroBudget.Data.Services
                 .ToListAsync();
         }
 
-        public Task<BudgetPeriod> GetLatestBudgetPeriod(string userId)
+        public async Task<BudgetPeriod> GetLatestBudgetPeriod(string userId)
         {
             if (string.IsNullOrEmpty(userId))
                 // No user Id specified, return null
                 return null;
 
-            return _context.budgetPeriods
+            return await _context.budgetPeriods
                 .AsNoTracking()
+                .Include(bp => bp.BudgetPeriodType)
                 // For the specified user
                 .Where(bp => bp.UserId == userId)
                 // Order by StartDate descending
@@ -57,13 +62,13 @@ namespace ZeroBudget.Data.Services
                 .FirstOrDefaultAsync();
         }
 
-        public Task<List<BudgetPeriod>> GetBudgetPeriodsForCurrentMonth(string userId)
+        public async Task<List<BudgetPeriod>> GetBudgetPeriodsForCurrentMonth(string userId)
         {
             if (string.IsNullOrEmpty(userId))
                 // No user Id specified, return an empty list
-                return Task.FromResult(new List<BudgetPeriod>());
+                return new List<BudgetPeriod>();
 
-            return _context.budgetPeriods
+            return await _context.budgetPeriods
                 .AsNoTracking()
                 // Get budget periods
                 .Where(bp => bp.UserId == userId
@@ -71,8 +76,8 @@ namespace ZeroBudget.Data.Services
                 .ToListAsync();
         }
 
-        public bool AddBudgetPeriod(string userId, DateTime startDate,
-            byte budgetPeriodTypeId)
+        public async Task<bool> AddBudgetPeriod(string userId, DateTime startDate,
+            int budgetPeriodTypeId)
         {
             try
             {
@@ -80,11 +85,11 @@ namespace ZeroBudget.Data.Services
                     // No user Id specified, return false
                     return false;
 
-                if (_context.budgetPeriods
+                if (await _context.budgetPeriods
                     .AsNoTracking()
                     .Where(bp => bp.UserId == userId
                     && bp.StartDate == startDate
-                    && bp.BudgetPeriodTypeId == budgetPeriodTypeId).Any())
+                    && bp.BudgetPeriodTypeId == budgetPeriodTypeId).AnyAsync())
                     // The budget period already exists, don't add another one
                     return true;
 
@@ -97,9 +102,10 @@ namespace ZeroBudget.Data.Services
                 });
 
                 // Save the changes
-                _context.SaveChanges();
-
-                return true;
+                if (await _context.SaveChangesAsync() > 0)
+                    return true;
+                else
+                    return false;
             }
             catch (Exception)
             {
@@ -107,7 +113,7 @@ namespace ZeroBudget.Data.Services
             }
         }
 
-        public bool UpdateBudgetPeriod(string userId, BudgetPeriod budgetPeriod)
+        public async Task<bool> UpdateBudgetPeriod(string userId, BudgetPeriod budgetPeriod)
         {
             try
             {
@@ -116,10 +122,10 @@ namespace ZeroBudget.Data.Services
                     return false;
 
                 var budgetPeriodToUpdate
-                    = _context.budgetPeriods
+                    = await _context.budgetPeriods
                     .Where(bp => bp.UserId == userId
                     && bp.BudgetPeriodId == budgetPeriod.BudgetPeriodId)
-                    .FirstOrDefault();
+                    .FirstOrDefaultAsync();
 
                 if (budgetPeriodToUpdate == null)
                     // No existing budget period found, return false
@@ -134,12 +140,50 @@ namespace ZeroBudget.Data.Services
                     = budgetPeriod.StartDate;
 
                 // Save changes
-                _context.SaveChanges();
-
-                return true;
+                if (await _context.SaveChangesAsync() > 0)
+                    return true;
+                else
+                    return false;
             }
             catch (Exception)
             {
+                return false;
+            }
+        }
+
+        public async Task<bool> DeleteBudgetPeriod(string userId, int budgetPeriodId)
+        {
+            // Find the budget period
+            var budgetPeriod
+                = await _context.budgetPeriods
+                .FirstOrDefaultAsync(
+                bp => bp.BudgetPeriodId == budgetPeriodId);
+
+            if (budgetPeriod == null
+                || (budgetPeriod.UserId != userId))
+                // Either the budget period does not exist or the
+                // user does not own the budget period, return false.
+                return false;
+
+            // Determine whether the budget period is being used
+            if (await _context.budgetItems.AnyAsync(bi => bi.BudgetPeriodId == budgetPeriodId)
+                || await _context.actualItems.AnyAsync(ai => ai.BudgetPeriodId == budgetPeriodId))
+                // It is being used, return false, it can't be removed
+                return false;
+
+            try
+            {
+                // Else remove the period
+                _context.budgetPeriods.Remove(budgetPeriod);
+
+                if (await _context.SaveChangesAsync() > 0)
+                    return true;
+                else
+                    return false;
+            }
+            catch(Exception)
+            {
+                // Something bad happened, returned false
                 return false;
             }
         }
@@ -148,7 +192,7 @@ namespace ZeroBudget.Data.Services
 
         #region BudgetCategories
 
-        public bool AddBudgetCategory(string userId, string name,
+        public async Task<bool> AddBudgetCategory(string userId, string name,
             bool isTaxDeductible = false, int? parentCategoryId = null)
         {
             try
@@ -157,11 +201,11 @@ namespace ZeroBudget.Data.Services
                     // You must provide a user Id
                     return false;
 
-                if (_context.budgetCategories.Any(
+                if (await _context.budgetCategories.AnyAsync(
                     bc => bc.UserId == userId
                     && bc.Name == name
                     && bc.IsTaxDeductible == isTaxDeductible
-                    && bc.ParentBudgetCategoryId == parentCategoryId))
+                    && bc.ParentBudgetCategoryId == parentCategoryId) == true)
                     // It already exists, dont add it again
                     return true;
 
@@ -176,9 +220,10 @@ namespace ZeroBudget.Data.Services
                     });
                 
                 // Save the changes
-                _context.SaveChanges();
-
-                return true;
+                if (await _context.SaveChangesAsync() > 0 )
+                    return true;
+                else
+                    return false;
             }
             catch (Exception)
             {
@@ -186,21 +231,21 @@ namespace ZeroBudget.Data.Services
             }
         }
 
-        public Task<BudgetCategory> GetBudgetCategory(string userId, int budgetCategoryId)
+        public async Task<BudgetCategory> GetBudgetCategory(string userId, int budgetCategoryId)
         {
-            return _context.budgetCategories
+            return await _context.budgetCategories
                 .FirstOrDefaultAsync(
                 bc => bc.UserId == userId 
                 && bc.BudgetCategoryId == budgetCategoryId);
         }
 
-        public Task<List<BudgetCategory>> GetBudgetCategories(string userId)
+        public async Task<List<BudgetCategory>> GetBudgetCategories(string userId)
         {
             if (string.IsNullOrEmpty(userId))
                 // Return an empty list, no user Id was supplied
-                return Task.FromResult(new List<BudgetCategory>());
+                return new List<BudgetCategory>();
 
-            return _context.budgetCategories
+            return await _context.budgetCategories
                 // Get the user defined categories as well as
                 // the system defined categories
                 .Where(bc => bc.UserId == userId 
@@ -209,7 +254,7 @@ namespace ZeroBudget.Data.Services
                 .ToListAsync();
         }
 
-        public bool UpdateBudgetCategory(string userId, BudgetCategory budgetCategory)
+        public async Task<bool> UpdateBudgetCategory(string userId, BudgetCategory budgetCategory)
         {
             try
             {
@@ -219,10 +264,10 @@ namespace ZeroBudget.Data.Services
 
                 // Find the item to update
                 var budgetCategoryToUpdate
-                    = _context.budgetCategories
+                    = await _context.budgetCategories
                     .Where(bc => bc.UserId == userId
                     && bc.BudgetCategoryId == budgetCategory.BudgetCategoryId)
-                    .FirstOrDefault();
+                    .FirstOrDefaultAsync();
 
                 if (budgetCategoryToUpdate == null)
                     // The item does not exists, return false
@@ -237,9 +282,10 @@ namespace ZeroBudget.Data.Services
                     = budgetCategory.IsTaxDeductible;
 
                 // Save changes
-                _context.SaveChanges();
-
-                return true;
+                if (await _context.SaveChangesAsync() > 0)
+                    return true;
+                else
+                    return false;
             }
             catch (Exception)
             {
@@ -247,7 +293,448 @@ namespace ZeroBudget.Data.Services
             }
         }
 
+        public async Task<bool> DeleteBudgetCategory(string userId, int budgetCategoryId)
+        {
+            // Find the budget category
+            var budgetCategory
+                = await _context.budgetCategories
+                .FirstOrDefaultAsync(
+                bc => bc.BudgetCategoryId == budgetCategoryId);
+
+            if (budgetCategory == null
+                || (budgetCategory != null 
+                && budgetCategory.UserId != userId))
+                // Either the budget category does not exist or
+                // the user does not own the budget category, return
+                // false.
+                return false;
+
+            // Determine whether the budget category is being used
+            if (await _context.budgetItems.AnyAsync(bi => bi.BudgetCategoryId == budgetCategoryId)
+                || await _context.actualItems.AnyAsync(ai => ai.BudgetCategoryId == budgetCategoryId))
+                // The budget category is in use, it can'tbe removed, return false
+                return false;
+
+            try
+            {
+                // Else remove the category
+                _context.budgetCategories.Remove(budgetCategory);
+
+                if (await _context.SaveChangesAsync() > 0)
+                    return true;
+                else
+                    return false;
+            }
+            catch (Exception)
+            {
+                // Something bad happened, returned false
+                return false;
+            }
+        }
+
         #endregion
 
+        #region BudgetItem
+
+        public async Task<bool> AddBudgetItem(string userId, int budgetCategoryId,
+            int budgetPeriodId, DateTime date, decimal amount,
+            TransactionType transactionType, bool isReoccurring,
+            int? frequencyTypeId = null, int? frequencyQuantity = null)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    return false;
+
+                // The budget category associated with the budget item
+                var budgetCategory 
+                    = await _context.budgetCategories
+                    .FirstOrDefaultAsync(
+                    bc => bc.BudgetCategoryId == budgetCategoryId);
+
+                // Does the user own the budget category
+                if (budgetCategory == null
+                    || budgetCategory.UserId != userId)
+                    // return false, the user doesn't own the budget category
+                    return false;
+
+                var budgetPeriod
+                    = await _context.budgetPeriods
+                    .FirstOrDefaultAsync(
+                    bp => bp.BudgetPeriodId == budgetPeriodId);
+
+                if (budgetPeriod == null
+                    || budgetPeriod.UserId != userId)
+                    // return false, the user doesn't own the budget period
+                    return false;
+
+                // Everything is good, add the item to the
+                // collection
+                _context.budgetItems.Add(new BudgetItem
+                {
+                    UserId = userId,
+                    BudgetCategoryId = budgetCategoryId,
+                    BudgetPeriodId = budgetPeriodId,
+                    Date = date,
+                    Amount = amount,
+                    TransactionType = transactionType,
+                    IsReoccurring = isReoccurring,
+                    FrequencyTypeId = frequencyTypeId,
+                    FrequencyQuantity = frequencyQuantity
+                });
+
+                // Save the item
+                if (await _context.SaveChangesAsync() > 0)
+                    return true;
+                else
+                    return false;
+            }
+            catch (Exception)
+            {
+                // Something bad happened, return false
+                return false;
+            }
+        }
+
+        public async Task<bool> UpdateBudgetItem(string userId, BudgetItem budgetItem)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    return false;
+
+                // The budget category associated with the budget item
+                var budgetCategory
+                    = await _context.budgetCategories
+                    .FirstOrDefaultAsync(
+                    bc => bc.BudgetCategoryId == budgetItem.BudgetCategoryId);
+
+                // Does the user own the budget category
+                if (budgetCategory == null
+                    || budgetCategory.UserId != userId)
+                    // return false, the user doesn't own the budget category
+                    return false;
+
+                var budgetPeriod
+                    = await _context.budgetPeriods
+                    .FirstOrDefaultAsync(
+                    bp => bp.BudgetPeriodId == budgetItem.BudgetPeriodId);
+
+                if (budgetPeriod == null
+                    || budgetPeriod.UserId != userId)
+                    // return false, the user doesn't own the budget period
+                    return false;
+
+                // Everything is good, update the item
+
+                // Get the current item
+                var currentBudgetItem 
+                    = await _context.budgetItems
+                    .FirstOrDefaultAsync(bi => bi.BudgetItemId == budgetItem.BudgetItemId);
+
+                // Update the current item
+                currentBudgetItem.UserId = userId;
+                currentBudgetItem.BudgetCategoryId = budgetItem.BudgetCategoryId;
+                currentBudgetItem.BudgetPeriodId = budgetItem.BudgetPeriodId;
+                currentBudgetItem.Date = budgetItem.Date;
+                currentBudgetItem.Amount = budgetItem.Amount;
+                currentBudgetItem.TransactionType = budgetItem.TransactionType;
+                currentBudgetItem.FrequencyTypeId = budgetItem.FrequencyTypeId;
+                currentBudgetItem.FrequencyQuantity = budgetItem.FrequencyQuantity;
+                _context.budgetItems.Update(currentBudgetItem);
+
+                // Save the item changes
+                if (await _context.SaveChangesAsync() > 0)
+                    return true;
+                else
+                    return false;
+            }
+            catch (Exception)
+            {
+                // Something bad happened, return false
+                return false;
+            }
+        }
+
+        public async Task<List<BudgetItem>> GetBudgetItemsForUser(string userId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    // The user is null or empty, return an empty collection
+                    return new List<BudgetItem>();
+
+                return await _context.budgetItems
+                    .Where(bi => bi.UserId == userId)
+                    .ToListAsync();
+            }
+            catch (Exception)
+            {
+                // Something bad happened, return an empty collection
+                return new List<BudgetItem>();
+            }
+        }
+
+        public async Task<List<BudgetItem>> GetBudgetItemsForUserAndBudgetPeriod(string userId, int budgetPeriodId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    // The user is null or empty, return an empty collection
+                    return new List<BudgetItem>();
+
+                var budgetPeriod
+                    = await _context.budgetPeriods
+                    .FirstOrDefaultAsync(bp => bp.BudgetPeriodId == budgetPeriodId);
+
+                if (budgetPeriod == null || budgetPeriod.UserId != userId)
+                    // The budget period user does not match the current user, return an empty collection
+                    return new List<BudgetItem>();
+
+                return await _context.budgetItems
+                    .Where(bi => bi.UserId == userId
+                    && bi.BudgetPeriodId == budgetPeriodId)
+                    .ToListAsync();
+            }
+            catch (Exception)
+            {
+                // Something bad happened, return an empty collection
+                return new List<BudgetItem>();
+            }
+        }
+
+        public async Task<bool> DeleteBudgetItem(string userId, int budgetItemId)
+        {
+            var budgetItem
+                = await _context.budgetItems
+                .FirstOrDefaultAsync(bi => bi.BudgetItemId == budgetItemId);
+
+            if (budgetItem == null
+                || (budgetItem != null && budgetItem.UserId != userId))
+                return false;
+
+            try
+            {
+                _context.budgetItems.Remove(budgetItem);
+
+                if (await _context.SaveChangesAsync() > 0)
+                    return true;
+                else
+                    return false;
+            }
+            catch (Exception)
+            {
+                // Something bad happened, return false
+                return false;
+            }
+        }
+
+        #endregion
+
+        #region ActualItem
+
+        public async Task<bool> AddActualItem(string userId, int budgetCategoryId,
+            int budgetPeriodId, DateTime date, decimal amount,
+            TransactionType transactionType)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    return false;
+
+                // The budget category associated with the budget item
+                var budgetCategory
+                    = await _context.budgetCategories
+                    .FirstOrDefaultAsync(
+                    bc => bc.BudgetCategoryId == budgetCategoryId);
+
+                // Does the user own the budget category
+                if (budgetCategory == null
+                    || budgetCategory.UserId != userId)
+                    // return false, the user doesn't own the budget category
+                    return false;
+
+                var budgetPeriod
+                    = await _context.budgetPeriods
+                    .FirstOrDefaultAsync(
+                    bp => bp.BudgetPeriodId == budgetPeriodId);
+
+                if (budgetPeriod == null
+                    || budgetPeriod.UserId != userId)
+                    // return false, the user doesn't own the budget period
+                    return false;
+
+                // Everything is good, add the item to the
+                // collection
+                _context.actualItems.Add(new ActualItem
+                {
+                    UserId = userId,
+                    BudgetCategoryId = budgetCategoryId,
+                    BudgetPeriodId = budgetPeriodId,
+                    Date = date,
+                    Amount = amount,
+                    TransactionType = transactionType
+                });
+
+                // Save the item
+                if (await _context.SaveChangesAsync() > 0)
+                    return true;
+                else
+                    return false;
+            }
+            catch (Exception)
+            {
+                // Something bad happened, return false
+                return false;
+            }
+        }
+
+        public async Task<bool> UpdateActualItem(string userId, ActualItem actualItem)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    return false;
+
+                // The budget category associated with the budget item
+                var budgetCategory
+                    = await _context.budgetCategories
+                    .FirstOrDefaultAsync(
+                    bc => bc.BudgetCategoryId == actualItem.BudgetCategoryId);
+
+                // Does the user own the budget category
+                if (budgetCategory == null
+                    || budgetCategory.UserId != userId)
+                    // return false, the user doesn't own the budget category
+                    return false;
+
+                var budgetPeriod
+                    = await _context.budgetPeriods
+                    .FirstOrDefaultAsync(
+                    bp => bp.BudgetPeriodId == actualItem.BudgetPeriodId);
+
+                if (budgetPeriod == null
+                    || budgetPeriod.UserId != userId)
+                    // return false, the user doesn't own the budget period
+                    return false;
+
+                // Everything is good, update the item
+
+                // Get the current item
+                var currentActualItem 
+                    = await _context.actualItems
+                    .FirstOrDefaultAsync(ai => ai.ActualItemId == actualItem.ActualItemId);
+
+                // Update the current item
+                currentActualItem.UserId = userId;
+                currentActualItem.BudgetCategoryId = actualItem.BudgetCategoryId;
+                currentActualItem.BudgetPeriodId = actualItem.BudgetPeriodId;
+                currentActualItem.Date = actualItem.Date;
+                currentActualItem.Amount = actualItem.Amount;
+                currentActualItem.TransactionType = actualItem.TransactionType;
+                _context.actualItems.Update(currentActualItem);
+
+                // Save the item changes
+                if (await _context.SaveChangesAsync() > 0)
+                    return true;
+                else
+                    return false;
+            }
+            catch (Exception)
+            {
+                // Something bad happened, return false
+                return false;
+            }
+        }
+
+        public async Task<List<ActualItem>> GetActualItemsForUser(string userId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    // The user is null or empty, return an empty collection
+                    return new List<ActualItem>();
+
+                return await _context.actualItems
+                    .Where(ai => ai.UserId == userId)
+                    .ToListAsync();
+            }
+            catch (Exception)
+            {
+                // Something bad happened, return an empty collection
+                return new List<ActualItem>();
+            }
+        }
+
+        public async Task<List<ActualItem>> GetActualItemsForUserAndBudgetPeriod(
+            string userId, int budgetPeriodId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    // The user is null or empty, return an empty collection
+                    return new List<ActualItem>();
+
+                var budgetPeriod
+                    = await _context.budgetPeriods
+                    .FirstOrDefaultAsync(bp => bp.BudgetPeriodId == budgetPeriodId);
+
+                if (budgetPeriod == null || budgetPeriod.UserId != userId)
+                    // The budget period user does not match the current user, return an empty collection
+                    return new List<ActualItem>();
+
+                return await _context.actualItems
+                    .Where(ai => ai.UserId == userId
+                    && ai.BudgetPeriodId == budgetPeriodId)
+                    .ToListAsync();
+            }
+            catch (Exception)
+            {
+                // Something bad happened, return an empty collection
+                return new List<ActualItem>();
+            }
+        }
+
+        public async Task<bool> DeleteActualItem(string userId, int actualItemId)
+        {
+            var actualItem
+                = await _context.actualItems
+                .FirstOrDefaultAsync(ai => ai.ActualItemId == actualItemId);
+
+            if (actualItem == null
+                || (actualItem != null && actualItem.UserId != userId))
+                return false;
+
+            try
+            {
+                _context.actualItems.Remove(actualItem);
+
+                if (await _context.SaveChangesAsync() > 0)
+                    return true;
+                else
+                    return false;
+            }
+            catch (Exception)
+            {
+                // Something bad happened, return false
+                return false;
+            }
+        }
+
+        #endregion
+
+        #region BudgetPeriodTypes
+
+        public async Task<List<BudgetPeriodType>> GetBudgetPeriodTypes()
+        {
+            return await _context.budgetPeriodTypes.ToListAsync();
+        }
+
+        #endregion
+
+        public async Task<List<FrequencyType>> GetFrequencyTypes()
+        {
+            return await _context.frequencyTypes.ToListAsync();
+        }
     }
 }

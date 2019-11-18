@@ -1,0 +1,194 @@
+﻿@page "/BudgetPeriods"
+
+@using ZeroBudget.Data.Services
+@using ZeroBudget.Data.EntityClasses
+@using Microsoft.AspNetCore.Identity;
+@inject UserManager<IdentityUser> UserManager
+@inherits OwningComponentBase<IBudgetingService>
+
+<AuthorizeView>
+    <Authorized Context="Auth">
+        <h3>Budget Periods</h3>
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Start Date</th>
+                    <th>Type</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (budgetPeriods == null)
+                {
+                    <tr>
+                        <td colspan="3">
+                            <p><em>Loading...</em></p>
+                        </td>
+                    </tr>
+                }
+                else if (budgetPeriods.Count() == 0)
+                {
+                    <tr colspan="3">
+                        <td>
+                            <span>No budget periods defined yet...</span>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var budgetPeriod in budgetPeriods)
+                    {
+                        <tr>
+                            <td>@budgetPeriod.StartDate.ToShortDateString()</td>
+                            <td>@budgetPeriod.BudgetPeriodType.Name</td>
+                            <td>
+                                <button class="btn btn-primary"
+                                    @onclick="@(f => DeleteBudgetPeriod(budgetPeriod.BudgetPeriodId))">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+
+        <p>
+            <button class="btn btn-primary" @onclick="AddNewBudgetPeriod">Add New Budget Period</button>
+        </p>
+
+        @if (showAddNewBudgetPeriodPopup)
+        {
+            <div class="modal" tabindex="-1" style="display: block;" role="dialog">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 class="modal-title">Add Budget Period</h3>
+                            <button type="button" class="close" 
+                                    @onclick="CloseAddNewBudgetPeriodPopUp">
+                                    <span aria-hidden="true">X</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <EditForm Model="@budgetPeriod" OnValidSubmit="@SaveBudgetPeriod">
+                                <DataAnnotationsValidator />
+                                <ValidationSummary />
+
+                                <div class="form-group">
+                                    <label class="font-weight-bold" for="budgetPeriodStartDate">
+                                        Start Date:
+                                    </label>
+                                    <InputDate id="budgetPeriodStartDate" class="form-control" 
+                                        @bind-Value="@budgetPeriod.StartDate" />
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="font-weight-bold" for="budgetPeriodType">Budget Period Type:</label>
+                                    <InputSelect id="budgetPeriodType" class="form-control" 
+                                                 @bind-Value="@budgetPeriod.BudgetPeriodTypeId">
+                                        <option value="0">Select</option>
+                                        @foreach (var budgetPeriodType in budgetPeriodTypes)
+                                            {
+                                            <option value="@budgetPeriodType.BudgetPeriodTypeId">@budgetPeriodType.Name</option>
+                                            }
+                                        /**/
+                                    </InputSelect>
+                                </div>
+                                <br />
+                                <button class="btn btn-primary" type="submit">
+                                    Save
+                                </button>
+                            </EditForm>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+    </Authorized>
+    <NotAuthorized>
+        Sorry you are not authorized to access this page...
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authStateTask { get; set; }
+
+    // The collection of budget periods
+    public IList<BudgetPeriod> budgetPeriods;
+
+    public IList<BudgetPeriodType> budgetPeriodTypes;
+
+    // The logged in user's user Id
+    private string userId;
+
+    // Indication of whether to show the pop-up
+    public bool showAddNewBudgetPeriodPopup = false;
+
+    // The new BudgetPeriod
+    public BudgetPeriod budgetPeriod;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Get the user Id
+        var authState = await authStateTask;
+        userId = authState.User.Identity.IsAuthenticated
+            ? UserManager.GetUserId(authState.User)
+            : string.Empty;
+
+        if (authState.User.Identity.IsAuthenticated
+            && !string.IsNullOrEmpty(userId))
+        {
+            budgetPeriods
+                = await Service.GetBudgetPeriods(userId);
+
+            budgetPeriodTypes
+                = await Service.GetBudgetPeriodTypes();
+        }
+    }
+
+    public void AddNewBudgetPeriod()
+    {
+        budgetPeriod
+            = new BudgetPeriod()
+            {
+                BudgetPeriodId = 0,
+                BudgetPeriodTypeId = 0,
+                StartDate = DateTime.Today.Date
+            };
+
+        showAddNewBudgetPeriodPopup = true;
+    }
+
+    public void CloseAddNewBudgetPeriodPopUp()
+    {
+        showAddNewBudgetPeriodPopup = false;
+    }
+
+    public async void SaveBudgetPeriod()
+    {
+        showAddNewBudgetPeriodPopup = false;
+
+        var result
+            = await Service.AddBudgetPeriod(userId, budgetPeriod.StartDate,
+            budgetPeriod.BudgetPeriodTypeId);
+
+        budgetPeriods
+            = await Service.GetBudgetPeriods(userId);
+
+        StateHasChanged();
+    }
+
+    public async void DeleteBudgetPeriod(int budgetPeriodId)
+    {
+        var result
+            = await Service.DeleteBudgetPeriod(userId, budgetPeriodId);
+
+        budgetPeriods
+            = await Service.GetBudgetPeriods(userId);
+
+        StateHasChanged();
+    }
+}

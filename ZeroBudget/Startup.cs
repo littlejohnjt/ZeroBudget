@@ -39,9 +39,9 @@ namespace ZeroBudget
                 .AddEntityFrameworkStores<ApplicationDbContext>();
             services.AddRazorPages();
             services.AddServerSideBlazor();
-            services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
-            services.AddSingleton<IBudgetingService, BudgetingService>();
-            services.AddSingleton<WeatherForecastService>();
+            services.AddScoped<AuthenticationStateProvider, 
+                RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
+            services.AddScoped<IBudgetingService, BudgetingService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
