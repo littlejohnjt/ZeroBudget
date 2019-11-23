@@ -2,14 +2,25 @@
 
 @using ZeroBudget.Data.Services
 @using ZeroBudget.Data.EntityClasses
-@using Microsoft.AspNetCore.Identity;
+@using ZeroBudget.Validation
+@using ZeroBudget.Components;
+@using Microsoft.AspNetCore.Identity
+
 @inject UserManager<IdentityUser> UserManager
 @inherits OwningComponentBase<IBudgetingService>
 
-<AuthorizeView>
-    <Authorized Context="Auth">
-        <h3>Budget Periods</h3>
+<h3>Budget Periods</h3>
 
+<AuthorizeView>
+    <!-- Show this section of the user is authenticated -->
+    <Authorized>
+        <p>
+            <!-- Add a new budget period -->
+            <button class="btn btn-primary"
+                    @onclick="AddNewBudgetPeriod">
+                Add New Budget Period
+            </button>
+        </p>
         <table class="table">
             <thead>
                 <tr>
@@ -29,8 +40,8 @@
                 }
                 else if (budgetPeriods.Count() == 0)
                 {
-                    <tr colspan="3">
-                        <td>
+                    <tr>
+                        <td colspan="3">
                             <span>No budget periods defined yet...</span>
                         </td>
                     </tr>
@@ -44,7 +55,11 @@
                             <td>@budgetPeriod.BudgetPeriodType.Name</td>
                             <td>
                                 <button class="btn btn-primary"
-                                    @onclick="@(f => DeleteBudgetPeriod(budgetPeriod.BudgetPeriodId))">
+                                        @onclick="@(() => EditBudgetPeriod(budgetPeriod))">
+                                    Edit
+                                </button>
+                                <button class="btn btn-primary"
+                                        @onclick="@(async () => await DeleteBudgetPeriod(budgetPeriod))">
                                     Delete
                                 </button>
                             </td>
@@ -54,53 +69,58 @@
             </tbody>
         </table>
 
-        <p>
-            <button class="btn btn-primary" @onclick="AddNewBudgetPeriod">Add New Budget Period</button>
-        </p>
-
-        @if (showAddNewBudgetPeriodPopup)
+        @if (showBudgetPeriodPopup)
         {
+            <!-- This is a popup to add/edit a budget period -->
             <div class="modal" tabindex="-1" style="display: block;" role="dialog">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h3 class="modal-title">Add Budget Period</h3>
-                            <button type="button" class="close" 
-                                    @onclick="CloseAddNewBudgetPeriodPopUp">
-                                    <span aria-hidden="true">X</span>
-                            </button>
+                            <h3 class="modal-title">Add/Edit Budget Period</h3>
+                            <button type="button" class="close"
+                                    @onclick="CloseBudgetPeriodPopUp">
+                                <span aria-hidden="true">X</span>
+                            </button> 
                         </div>
-                        <div class="modal-body">
-                            <EditForm Model="@budgetPeriod" OnValidSubmit="@SaveBudgetPeriod">
-                                <DataAnnotationsValidator />
-                                <ValidationSummary />
+                        <!-- Add/Edit form for the current budget period -->
+                        <EditForm Context="formContext"
+                                  Model="budgetPeriod"
+                                  OnValidSubmit="@(async () => await SaveBudgetPeriod())">
+                            <!-- Validate the form input -->
+                            <FluentValidator TValidator="BudgetPeriodValidator" />
 
+                            <div class="modal-body">
                                 <div class="form-group">
                                     <label class="font-weight-bold" for="budgetPeriodStartDate">
                                         Start Date:
                                     </label>
-                                    <InputDate id="budgetPeriodStartDate" class="form-control" 
-                                        @bind-Value="@budgetPeriod.StartDate" />
+                                    <InputDate id="budgetPeriodStartDate" class="form-control"
+                                               @bind-Value="budgetPeriod.StartDate" />
+                                    <ValidationMessage For="@(() => budgetPeriod.StartDate)" />
                                 </div>
-
                                 <div class="form-group">
-                                    <label class="font-weight-bold" for="budgetPeriodType">Budget Period Type:</label>
-                                    <InputSelect id="budgetPeriodType" class="form-control" 
-                                                 @bind-Value="@budgetPeriod.BudgetPeriodTypeId">
-                                        <option value="0">Select</option>
+                                    <label class="font-weight-bold" for="budgetPeriodType">
+                                        Budget Period Type:
+                                    </label>
+                                    <InputSelectNumber id="budgetPeriodType" class="form-control"
+                                                       @bind-Value="budgetPeriod.BudgetPeriodTypeId">
+                                        <option value="0">Select ...</option>
                                         @foreach (var budgetPeriodType in budgetPeriodTypes)
                                             {
                                             <option value="@budgetPeriodType.BudgetPeriodTypeId">@budgetPeriodType.Name</option>
                                             }
                                         /**/
-                                    </InputSelect>
+                                        /**/
+                                        /**/
+                                    </InputSelectNumber>
+                                    <ValidationMessage For="@(() => budgetPeriod.BudgetPeriodTypeId)" />
                                 </div>
                                 <br />
                                 <button class="btn btn-primary" type="submit">
                                     Save
                                 </button>
-                            </EditForm>
-                        </div>
+                            </div>
+                        </EditForm>
                     </div>
                 </div>
             </div>
@@ -117,19 +137,21 @@
     private Task<AuthenticationState> authStateTask { get; set; }
 
     // The collection of budget periods
-    public IList<BudgetPeriod> budgetPeriods;
+    public List<BudgetPeriod> budgetPeriods;
 
-    public IList<BudgetPeriodType> budgetPeriodTypes;
+    public List<BudgetPeriodType> budgetPeriodTypes
+        = new List<BudgetPeriodType>();
 
     // The logged in user's user Id
     private string userId;
 
-    // Indication of whether to show the pop-up
-    public bool showAddNewBudgetPeriodPopup = false;
+    // The new/edit BudgetPeriod
+    public BudgetPeriod budgetPeriod = new BudgetPeriod();
 
-    // The new BudgetPeriod
-    public BudgetPeriod budgetPeriod;
-
+    /// <summary>
+    /// OnInitializedAsync - Initialize the page
+    /// </summary>
+    /// <returns>Nothing</returns>
     protected override async Task OnInitializedAsync()
     {
         // Get the user Id
@@ -138,57 +160,107 @@
             ? UserManager.GetUserId(authState.User)
             : string.Empty;
 
+        // If the user is authenticated, retrieve info
         if (authState.User.Identity.IsAuthenticated
             && !string.IsNullOrEmpty(userId))
         {
             budgetPeriods
-                = await Service.GetBudgetPeriods(userId);
+                = await @Service.GetBudgetPeriods(userId);
 
             budgetPeriodTypes
-                = await Service.GetBudgetPeriodTypes();
+                = await @Service.GetBudgetPeriodTypes();
         }
     }
 
+    // Indication of whether to show the pop-up
+    public bool showBudgetPeriodPopup = false;
+
+    /// <summary>
+    /// AddNewBudgetPeriod
+    /// </summary>
     public void AddNewBudgetPeriod()
     {
+        // Create a new budget period
         budgetPeriod
-            = new BudgetPeriod()
+            = new BudgetPeriod
             {
                 BudgetPeriodId = 0,
                 BudgetPeriodTypeId = 0,
                 StartDate = DateTime.Today.Date
             };
 
-        showAddNewBudgetPeriodPopup = true;
+        // Show the pop-up dialog
+        showBudgetPeriodPopup = true;
     }
 
-    public void CloseAddNewBudgetPeriodPopUp()
+    /// <summary>
+    /// EditBudgetPeriod - Edit the selected budget period
+    /// </summary>
+    /// <param name="budgetPeriodToUpdate">The budget period to update</param>
+    public void EditBudgetPeriod(BudgetPeriod budgetPeriodToUpdate)
     {
-        showAddNewBudgetPeriodPopup = false;
+        budgetPeriod = budgetPeriodToUpdate;
+
+        showBudgetPeriodPopup = true;
     }
 
-    public async void SaveBudgetPeriod()
+    // Close the modal pop-up
+
+    /// <summary>
+    /// CloseBudgetPeriodPopUp - close the dialog
+    /// </summary>
+    public void CloseBudgetPeriodPopUp()
     {
-        showAddNewBudgetPeriodPopup = false;
+        showBudgetPeriodPopup = false;
+    }
 
-        var result
-            = await Service.AddBudgetPeriod(userId, budgetPeriod.StartDate,
-            budgetPeriod.BudgetPeriodTypeId);
+    /// <summary>
+    /// SaveBudgetPeriod - save the new or edited budvet period
+    /// </summary>
+    /// <returns>Status of the save operation</returns>
+    public async Task<bool> SaveBudgetPeriod()
+    {
+        bool result;
 
+        showBudgetPeriodPopup = false;
+
+        if (budgetPeriod.BudgetPeriodId == 0)
+        {
+            // This is a new budget period
+            result
+                = await @Service.AddBudgetPeriod(userId, budgetPeriod.StartDate,
+                budgetPeriod.BudgetPeriodTypeId);
+        }
+        else
+        {
+            // We're editing a budget period
+            result
+                = await @Service.UpdateBudgetPeriod(
+                userId, budgetPeriod);
+        }
+
+        // Get the latest budget periods
         budgetPeriods
-            = await Service.GetBudgetPeriods(userId);
+            = await @Service.GetBudgetPeriods(userId);
 
-        StateHasChanged();
+        return result;
     }
 
-    public async void DeleteBudgetPeriod(int budgetPeriodId)
+    /// <summary>
+    /// DeleteBudgetPeriod - Delete the specified budget period
+    /// </summary>
+    /// <param name="budgetPeriod"></param>
+    /// <returns>The status of the delete operation</returns>
+    public async Task<bool> DeleteBudgetPeriod(BudgetPeriod budgetPeriod)
     {
+        // Delete the budget period
         var result
-            = await Service.DeleteBudgetPeriod(userId, budgetPeriodId);
+            = await @Service.DeleteBudgetPeriod(userId, budgetPeriod.BudgetPeriodId);
 
+        // Get the latest budget periods
         budgetPeriods
-            = await Service.GetBudgetPeriods(userId);
+            = await @Service.GetBudgetPeriods(userId);
 
-        StateHasChanged();
+        return result;
     }
 }

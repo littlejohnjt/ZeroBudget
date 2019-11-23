@@ -246,6 +246,7 @@ namespace ZeroBudget.Data.Services
                 return new List<BudgetCategory>();
 
             return await _context.budgetCategories
+                .Include("ParentBudgetCategory")
                 // Get the user defined categories as well as
                 // the system defined categories
                 .Where(bc => bc.UserId == userId 

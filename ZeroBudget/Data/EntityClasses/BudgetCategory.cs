@@ -12,5 +12,7 @@ namespace ZeroBudget.Data.EntityClasses
         public string Name { get; set; }
         public int? ParentBudgetCategoryId { get; set; }
         public bool IsTaxDeductible { get; set; }
+
+        public BudgetCategory ParentBudgetCategory { get; set; }
     }
 }

@@ -38,6 +38,11 @@ namespace ZeroBudget.Data
                 .HasMaxLength(100);
             builder.Entity<BudgetCategory>().Property(bc => bc.UserId)
                 .HasMaxLength(450);
+            builder.Entity<BudgetCategory>().Property(bc => bc.IsTaxDeductible)
+                .IsRequired();
+            builder.Entity<BudgetCategory>().HasOne(bc => bc.ParentBudgetCategory)
+                .WithMany()
+                .HasForeignKey(bc => bc.ParentBudgetCategoryId);
 
             // Some starting categories
             builder.Entity<BudgetCategory>().HasData(

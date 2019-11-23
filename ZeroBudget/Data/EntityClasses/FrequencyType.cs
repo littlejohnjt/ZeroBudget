@@ -9,14 +9,7 @@ namespace ZeroBudget.Data.EntityClasses
     public class FrequencyType
     {
         public int FrequencyTypeId { get; set; }
-
-        [Required]
-        [Display(Name = "Name")]
-        [DataType(DataType.Text)]
         public string Name { get; set; }
-
-        [Display(Name = "Description")]
-        [DataType(DataType.Text)]
         public string Description { get; set; }
     }
 }

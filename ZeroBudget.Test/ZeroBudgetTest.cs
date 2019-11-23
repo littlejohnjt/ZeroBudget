@@ -87,6 +87,8 @@ namespace ZeroBudget.Test
             var user2 = "xyz789";
             var date = new DateTime(2019, 11, 1);
 
+            _context.budgetPeriodTypes.Add(new BudgetPeriodType { BudgetPeriodTypeId = 1, Name = "1", Description = "1" });
+            _context.budgetPeriodTypes.Add(new BudgetPeriodType { BudgetPeriodTypeId = 2, Name = "2", Description = "2" });
             _context.budgetPeriods.Add(new BudgetPeriod { UserId = user, BudgetPeriodTypeId = 1, StartDate = date });
             _context.budgetPeriods.Add(new BudgetPeriod { UserId = user2, BudgetPeriodTypeId = 2, StartDate = date });
             _context.SaveChanges();
@@ -167,6 +169,11 @@ namespace ZeroBudget.Test
             Assert.True(budgetPeriod == null);
 
             // Get a colletion of BudgetPeriods
+            _context.budgetPeriodTypes.Add(new BudgetPeriodType { BudgetPeriodTypeId = 1, Name = "1", Description = "1" });
+            _context.budgetPeriodTypes.Add(new BudgetPeriodType { BudgetPeriodTypeId = 2, Name = "2", Description = "2" });
+            _context.budgetPeriodTypes.Add(new BudgetPeriodType { BudgetPeriodTypeId = 3, Name = "3", Description = "3" });
+            _context.budgetPeriodTypes.Add(new BudgetPeriodType { BudgetPeriodTypeId = 4, Name = "3", Description = "4" });
+            _context.budgetPeriodTypes.Add(new BudgetPeriodType { BudgetPeriodTypeId = 5, Name = "3", Description = "4" });
             _context.budgetPeriods.Add(new BudgetPeriod { UserId = user1, BudgetPeriodTypeId = 1, StartDate = date });
             _context.budgetPeriods.Add(new BudgetPeriod { UserId = user1, BudgetPeriodTypeId = 2, StartDate = date.AddDays(1) });
             _context.budgetPeriods.Add(new BudgetPeriod { UserId = user2, BudgetPeriodTypeId = 1, StartDate = date });
